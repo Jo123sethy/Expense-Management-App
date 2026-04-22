@@ -1,195 +1,381 @@
-import { View, TextInput, StyleSheet, TouchableOpacity, Text } from "react-native";
-import { useState } from "react";
+﻿import { StatusBar } from "expo-status-bar";
+import { useState, useEffect } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { COLORS } from "../constants/colors";
-import { getExpenses, saveExpenses } from "../storage/storage";
-import { useEffect } from "react";
-import { getCategories, saveCategories } from "../storage/categoryStorage";
+import { useFonts as useSoraFonts, Sora_400Regular, Sora_500Medium, Sora_600SemiBold } from "@expo-google-fonts/sora";
+import { useFonts as useManropeFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold } from "@expo-google-fonts/manrope";
 
+import CategoryChip from "../components/CategoryChip";
+import { getCategories, getExpenses, getBudgetGoal, saveBudgetGoal, saveCategories, saveExpenses } from "../storage/storage";
+import { Category, Expense, ThemeMode } from "@/constants/types";
+import { DARK_THEME, LIGHT_THEME } from "../styles/globalStyles";
 
-export default function AddExpense() {
+const accentPalette = ["#8B5CF6", "#3B82F6", "#F97316", "#34D399", "#F43F5E"];
+
+function formatDate(date: Date) {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+export default function AddExpenseScreen() {
   const router = useRouter();
-
   const [amount, setAmount] = useState("");
-const [categories, setCategories] = useState<string[]>([]);
-const [showAddCategory, setShowAddCategory] = useState(false);
-const [newCategory, setNewCategory] = useState("");
-const [errors, setErrors] = useState<any>({});
-const [category, setCategory] = useState("");   // ✅ ADD THIS
-const [note, setNote] = useState(""); 
-const handleSave = async () => {
-  let newErrors: any = {};
+  const [note, setNote] = useState("");
+  const [category, setCategory] = useState("Food");
+  const [date, setDate] = useState(formatDate(new Date()));
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [newCategory, setNewCategory] = useState("");
+  const [budgetGoal, setBudgetGoal] = useState(4200);
+  const [budgetInput, setBudgetInput] = useState("4200");
+  const [showDateMenu, setShowDateMenu] = useState(false);
 
-  if (!amount) newErrors.amount = "Amount is required";
-  if (!category) newErrors.category = "Category is required";
+  const [soraLoaded] = useSoraFonts({
+    Sora_400Regular,
+    Sora_500Medium,
+    Sora_600SemiBold,
+  });
+  const [manropeLoaded] = useManropeFonts({
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+  });
 
-  setErrors(newErrors);
+  const themeMode: ThemeMode = "dark";
+  const theme = themeMode === "dark" ? DARK_THEME : LIGHT_THEME;
 
-  if (Object.keys(newErrors).length > 0) return;
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
-  const newExpense = {
-    id: Date.now(),
-    amount: Number(amount),
-    category,
-    note,
-    date: new Date().toISOString(),
+  const loadSettings = async () => {
+    const [savedCategories, savedGoal] = await Promise.all([getCategories(), getBudgetGoal()]);
+    setCategories(savedCategories);
+    setBudgetGoal(savedGoal);
+    setBudgetInput(String(savedGoal));
+    setCategory(savedCategories[0]?.name ?? "Food");
   };
 
-  const existing = await getExpenses();
-  const updated = [newExpense, ...existing];
+  const handleSaveExpense = async () => {
+    if (!amount || Number(amount) <= 0) {
+      return;
+    }
 
-  await saveExpenses(updated);
+    const expense: Expense = {
+      id: `${Date.now()}`,
+      amount: Number(amount),
+      category,
+      note,
+      date,
+    };
 
-  router.back();
-};
-useEffect(() => {
-  loadCategories();
-}, []);
+    const existing = await getExpenses();
+    await saveExpenses([expense, ...existing]);
+    router.back();
+  };
 
-const loadCategories = async () => {
-  const data = await getCategories();
-  setCategories(data);
-};
+  const handleAddCategory = async () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+    const accent = accentPalette[Math.floor(Math.random() * accentPalette.length)];
+    const nextCategory: Category = {
+      id: trimmed.toLowerCase().replace(/\s+/g, "-"),
+      name: trimmed,
+      icon: "⭐",
+      accent,
+    };
+    const updated = [...categories, nextCategory];
+    await saveCategories(updated);
+    setCategories(updated);
+    setCategory(trimmed);
+    setNewCategory("");
+  };
+
+  const handleBudgetUpdate = async () => {
+    const value = Number(budgetInput);
+    if (value <= 0) return;
+    await saveBudgetGoal(value);
+    setBudgetGoal(value);
+  };
+
+  const calendarOptions = Array.from({ length: 7 }).map((_, index) => {
+    const next = new Date();
+    next.setDate(next.getDate() + index);
+    return formatDate(next);
+  });
+
+  if (!soraLoaded || !manropeLoaded) {
+    return null;
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Add Expense</Text>
-
-    <Text style={styles.label}>Amount *</Text>
-
-<TextInput
-  placeholder="Enter amount"
-  keyboardType="numeric"
-  value={amount}
-  onChangeText={setAmount}
-  style={styles.input}
-/>
-
-{errors.amount && <Text style={styles.error}>{errors.amount}</Text>}
-
-    <Text style={styles.label}>Category *</Text>
-
-<View style={styles.dropdown}>
-  {categories.map((cat) => (
-    <TouchableOpacity
-      key={cat}
-      style={[
-        styles.categoryItem,
-        category === cat && styles.selectedCategory,
-      ]}
-      onPress={() => setCategory(cat)}
-    >
-<Text style={{ color: category === cat ? "#fff" : "#000" }}>
-  {cat}
-</Text>
-</TouchableOpacity>
-  ))}
-
-  <TouchableOpacity
-    style={styles.addCategory}
-    onPress={() => setShowAddCategory(true)}
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>      
+      <StatusBar style="light" />
+      <View style={styles.backdrop} />
+   <KeyboardAvoidingView
+  style={styles.wrapper}
+  behavior={Platform.OS === "ios" ? "padding" : "height"}
+>
+  <ScrollView
+    showsVerticalScrollIndicator={false}
+    keyboardShouldPersistTaps="handled"
+    contentContainerStyle={{ paddingBottom: 40 }}
   >
-    <Text style={{ fontSize: 12 }}>➕</Text>
-  </TouchableOpacity>
-</View>
+    <View style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>         
+          <View style={styles.handle} />
+          <Text style={[styles.heading, { color: theme.text }]}>Add New Expense</Text>
+          <Text style={[styles.subtitle, { color: theme.subText }]}>Capture spend details, category, and target budget.</Text>
 
-{errors.category && <Text style={styles.error}>{errors.category}</Text>}
-{showAddCategory && (
-  <View>
-    <Text style={styles.label}>New Category *</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: theme.subText }]}>Amount</Text>
+            <TextInput
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+              placeholder="₹ 0"
+              placeholderTextColor={theme.subText}
+              style={[styles.input, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+            />
+          </View>
 
-    <TextInput
-      value={newCategory}
-      onChangeText={setNewCategory}
-      style={styles.input}
-      placeholder="Enter category"
-    />
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: theme.subText }]}>Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryPicker}>
+              {categories.map((item) => (
+                <CategoryChip
+                  key={item.id}
+                  title={item.name}
+                  icon={item.icon}
+                  accent={item.accent}
+                  selected={category === item.name}
+                  theme={theme}
+                  onPress={() => setCategory(item.name)}
+                />
+              ))}
+              <TouchableOpacity
+                style={[styles.addCategory, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => setNewCategory("")}
+              >
+                <Text style={[styles.addText, { color: theme.primary }]}>+ Add</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
 
-    <TouchableOpacity
-      style={styles.button}
-      onPress={async () => {
-        if (!newCategory) return;
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: theme.subText }]}>Date</Text>
+            <TouchableOpacity style={[styles.input, styles.dateInput, { backgroundColor: theme.surface, borderColor: theme.border }]} onPress={() => setShowDateMenu((prev) => !prev)}>
+              <Text style={[styles.dateText, { color: theme.text }]}>{date}</Text>
+            </TouchableOpacity>
+            {showDateMenu && (
+              <View style={[styles.dateMenu, { backgroundColor: theme.surface, borderColor: theme.border }]}>                
+                {calendarOptions.map((option) => (
+                  <TouchableOpacity key={option} onPress={() => { setDate(option); setShowDateMenu(false); }} style={styles.dateOption}>
+                    <Text style={[styles.dateOptionText, { color: theme.text }]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
 
-        const updated = [...categories, newCategory];
-        setCategories(updated);
-        await saveCategories(updated);
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: theme.subText }]}>Note</Text>
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              placeholder="Coffee, groceries, travel..."
+              placeholderTextColor={theme.subText}
+              style={[styles.input, styles.textArea, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+              multiline
+            />
+          </View>
 
-        setCategory(newCategory);
-        setNewCategory("");
-        setShowAddCategory(false);
-      }}
-    >
-      <Text style={styles.buttonText}>Save Category</Text>
-    </TouchableOpacity>
-  </View>
-)}
-     <Text style={styles.label}>Note</Text>
+          <View style={styles.row}>            
+            <View style={[styles.budgetCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>              
+              <Text style={[styles.fieldLabel, { color: theme.subText }]}>Monthly goal</Text>
+              <Text style={[styles.currentGoal, { color: theme.text }]}>Current goal: ₹ {budgetGoal}</Text>
+              <TextInput
+                value={budgetInput}
+                onChangeText={setBudgetInput}
+                keyboardType="numeric"
+                placeholder="4200"
+                placeholderTextColor={theme.subText}
+                style={[styles.input, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, paddingHorizontal: 12 }]}
+              />
+            </View>
+            <TouchableOpacity style={[styles.styledButton, { backgroundColor: theme.primary }]} onPress={handleBudgetUpdate}>
+              <Text style={styles.styledButtonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
 
-<TextInput
-  placeholder="Enter note"
-  value={note}
-  onChangeText={setNote}
-  style={styles.input}
-/>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: theme.subText }]}>Create new category</Text>
+            <View style={styles.row}>              
+              <TextInput
+                value={newCategory}
+                onChangeText={setNewCategory}
+                placeholder="Enter category name"
+                placeholderTextColor={theme.subText}
+                style={[styles.input, { flex: 1, backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+              />
+              <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.primary }]} onPress={handleAddCategory}>
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>Save Expense</Text>
-      </TouchableOpacity>
-    </View>
+          <TouchableOpacity style={[styles.saveButton, { backgroundColor: theme.primary }]} onPress={handleSaveExpense}>
+            <Text style={styles.saveButtonText}>Save Expense</Text>
+          </TouchableOpacity>
+           </View>
+  </ScrollView>
+</KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 18 },
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
+  safe: {
+    flex: 1,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(7,16,31,0.9)",
+  },
+  wrapper: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingVertical: 24,
+    paddingHorizontal: 22,
+    borderWidth: 1,
+  },
+  handle: {
+    width: 64,
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 4,
+    alignSelf: "center",
+    marginBottom: 18,
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    marginBottom: 22,
+  },
+  fieldGroup: {
+    marginBottom: 18,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  currentGoal: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
   input: {
+    width: "100%",
     borderWidth: 1,
     borderRadius: 18,
-    padding: 12,
-    marginBottom: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    fontFamily: "Manrope_400Regular",
   },
-  button: {
-    backgroundColor: COLORS.primary,
-    padding: 15,
-    borderRadius: 10,
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: "top",
+  },
+  categoryPicker: {
+    flexDirection: "row",
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontWeight: "bold" },
-  label: {
-  marginBottom: 5,
-  fontWeight: "600",
-  color: "#374151",
-},
-
-error: {
-  color: "red",
-  marginBottom: 10,
-},
-
-dropdown: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  marginBottom: 15,
-},
-
-categoryItem: {
-  padding: 10,
-  backgroundColor: "#eee",
-  borderRadius: 8,
-  marginRight: 8,
-  marginBottom: 8,
-},
-
-selectedCategory: {
-  backgroundColor: "#4F46E5",
-},
-
-addCategory: {
-  padding: 10,
-  borderWidth: 1,
-  borderRadius: 12,
-  height: 40,
-  width: 40,
-  justifyContent: "center",
-  alignItems: "center",
-},
+  addCategory: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginLeft: 4,
+  },
+  addText: {
+    fontWeight: "700",
+  },
+  dateInput: {
+    justifyContent: "center",
+  },
+  dateText: {
+    fontSize: 15,
+  },
+  dateMenu: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  dateOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  dateOptionText: {
+    fontSize: 15,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  budgetCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 14,
+    marginRight: 12,
+  },
+  styledButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  styledButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  addButton: {
+    marginLeft: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 20,
+  },
+  addButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  saveButton: {
+    marginTop: 12,
+    paddingVertical: 18,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

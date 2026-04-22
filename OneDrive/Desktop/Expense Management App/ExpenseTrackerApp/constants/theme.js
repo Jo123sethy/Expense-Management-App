@@ -14,14 +14,22 @@ export const theme = {
 };
 export const lightTheme = {
   background: "#F5F7FB",
-  card: "#FFFFFF",
+  card: "rgba(255,255,255,0.7)",   
   text: "#111827",
   subText: "#6B7280",
+  border: "rgba(0,0,0,0.05)",
+  primary: "#7C7CFB",
+  gradientA: "#7C7CFB",
+  gradientB: "#A78BFA",
 };
 
 export const darkTheme = {
-  background: "#0F172A",
-  card: "#1E293B",
+  background: "#0B1220",
+  card: "rgba(30,41,59,0.6)",  
   text: "#FFFFFF",
   subText: "#9CA3AF",
+  border: "rgba(255,255,255,0.08)",
+  primary: "#8B5CF6",
+  gradientA: "#6366F1",
+  gradientB: "#A855F7",
 };
