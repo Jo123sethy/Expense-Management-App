@@ -1,0 +1,4 @@
+[build]
+  base = "ExpenseTrackerApp"
+  command = "npx expo export"
+  publish = "ExpenseTrackerApp/dist"
