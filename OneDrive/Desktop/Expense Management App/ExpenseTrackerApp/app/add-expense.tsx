@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFonts as useSoraFonts, Sora_400Regular, Sora_500Medium, Sora_600SemiBold } from "@expo-google-fonts/sora";
 import { useFonts as useManropeFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold } from "@expo-google-fonts/manrope";
 
@@ -37,6 +37,12 @@ export default function AddExpenseScreen() {
   const [budgetGoal, setBudgetGoal] = useState(4200);
   const [budgetInput, setBudgetInput] = useState("4200");
   const [showDateMenu, setShowDateMenu] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  const params = useLocalSearchParams();
+  const paramThemeMode = (params.themeMode as ThemeMode) || 'dark';
+  const themeMode = paramThemeMode;
+  const theme = themeMode === "dark" ? DARK_THEME : LIGHT_THEME;
 
   const [soraLoaded] = useSoraFonts({
     Sora_400Regular,
@@ -49,10 +55,24 @@ export default function AddExpenseScreen() {
     Manrope_600SemiBold,
   });
 
-  const themeMode: ThemeMode = "dark";
-  const theme = themeMode === "dark" ? DARK_THEME : LIGHT_THEME;
+  useEffect(() => {
+    const editingStr = params.editingExpense as string;
+    if (editingStr) {
+      try {
+        const parsed = JSON.parse(editingStr);
+        setEditingExpense(parsed);
+        setAmount(String(parsed.amount));
+        setNote(parsed.note || '');
+        setCategory(parsed.category);
+        setDate(parsed.date);
+      } catch (e) {
+        console.error('Failed to parse editingExpense', e);
+      }
+    }
+  }, [params.editingExpense]);
 
   useEffect(() => {
+    if (editingExpense) return; // Skip if editing, category already set
     loadSettings();
   }, []);
 
@@ -61,7 +81,10 @@ export default function AddExpenseScreen() {
     setCategories(savedCategories);
     setBudgetGoal(savedGoal);
     setBudgetInput(String(savedGoal));
-    setCategory(savedCategories[0]?.name ?? "Food");
+    const defaultCat = savedCategories[0]?.name ?? "Food";
+    if (!editingExpense) {
+      setCategory(defaultCat);
+    }
   };
 
   const handleSaveExpense = async () => {
@@ -69,16 +92,19 @@ export default function AddExpenseScreen() {
       return;
     }
 
-    const expense: Expense = {
-      id: `${Date.now()}`,
+    const updatedExpense: Expense = {
+      ...(editingExpense || { id: `${Date.now()}` }),
       amount: Number(amount),
       category,
-      note,
+      note: note || '',
       date,
     };
 
     const existing = await getExpenses();
-    await saveExpenses([expense, ...existing]);
+    const updatedExpenses = editingExpense 
+      ? existing.map(e => e.id === editingExpense.id ? updatedExpense : e)
+      : [updatedExpense, ...existing];
+    await saveExpenses(updatedExpenses);
     router.back();
   };
 
@@ -118,20 +144,23 @@ export default function AddExpenseScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>      
-      <StatusBar style="light" />
-      <View style={styles.backdrop} />
+      <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
+      <View style={StyleSheet.absoluteFill}>
+        <View style={[styles.blob, styles.blobLeft, { backgroundColor: theme.gradientA }]} />
+        <View style={[styles.blob, styles.blobRight, { backgroundColor: theme.gradientB }]} />
+      </View>
    <KeyboardAvoidingView
   style={styles.wrapper}
   behavior={Platform.OS === "ios" ? "padding" : "height"}
 >
   <ScrollView
+    contentContainerStyle={styles.container}
     showsVerticalScrollIndicator={false}
     keyboardShouldPersistTaps="handled"
-    contentContainerStyle={{ paddingBottom: 40 }}
   >
     <View style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>         
           <View style={styles.handle} />
-          <Text style={[styles.heading, { color: theme.text }]}>Add New Expense</Text>
+          <Text style={[styles.heading, { color: theme.text }]}>{editingExpense ? 'Edit Expense' : 'Add New Expense'}</Text>
           <Text style={[styles.subtitle, { color: theme.subText }]}>Capture spend details, category, and target budget.</Text>
 
           <View style={styles.fieldGroup}>
@@ -160,12 +189,12 @@ export default function AddExpenseScreen() {
                   onPress={() => setCategory(item.name)}
                 />
               ))}
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={[styles.addCategory, { backgroundColor: theme.surface, borderColor: theme.border }]}
                 onPress={() => setNewCategory("")}
               >
                 <Text style={[styles.addText, { color: theme.primary }]}>+ Add</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </ScrollView>
           </View>
 
@@ -231,8 +260,13 @@ export default function AddExpenseScreen() {
             </View>
           </View>
 
+          {editingExpense && (
+            <TouchableOpacity style={[styles.saveButton, { backgroundColor: theme.danger, marginBottom: 12 }]} onPress={() => router.back()}>
+              <Text style={[styles.saveButtonText, { color: '#fff' }]}>Cancel</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.saveButton, { backgroundColor: theme.primary }]} onPress={handleSaveExpense}>
-            <Text style={styles.saveButtonText}>Save Expense</Text>
+            <Text style={styles.saveButtonText}>{editingExpense ? 'Update Expense' : 'Save Expense'}</Text>
           </TouchableOpacity>
            </View>
   </ScrollView>
@@ -245,9 +279,30 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
+  container: {
+    paddingHorizontal: 20,
+    top:38,
+    paddingBottom: 100,
+  },
+  blob: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 200,
+    opacity: 0.22,
+    transform: [{ scale: 1.2 }],
+  },
+  blobLeft: {
+    top: -60,
+    left: -80,
+  },
+  blobRight: {
+    top: 80,
+    right: -90,
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(7,16,31,0.9)",
+    backgroundColor: "rgba(15,23,42,0.92)",
   },
   wrapper: {
     flex: 1,
@@ -263,7 +318,7 @@ const styles = StyleSheet.create({
   handle: {
     width: 64,
     height: 6,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    // backgroundColor: "rgba(155, 50, 50, 0.2)",
     borderRadius: 4,
     alignSelf: "center",
     marginBottom: 18,

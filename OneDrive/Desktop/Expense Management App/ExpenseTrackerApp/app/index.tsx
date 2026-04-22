@@ -67,6 +67,16 @@ export default function HomeScreen() {
     setGoal(budgetGoal);
   };
 
+  const handleEdit = (expense: Expense) => {
+    router.push({
+      pathname: '/add-expense',
+      params: {
+        editingExpense: JSON.stringify(expense),
+        themeMode,
+      },
+    });
+  };
+
   const handleDelete = async (id: string) => {
     const filtered = expenses.filter((expense) => expense.id !== id);
     await saveExpenses(filtered);
@@ -104,7 +114,7 @@ export default function HomeScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Header
-          title="Aurora Expense Tracker"
+          title="Expense Tracker"
           subtitle="Premium glass finance dashboard"
           theme={theme}
           mode={themeMode}
@@ -114,7 +124,7 @@ export default function HomeScreen() {
         <View style={[styles.heroCard, { backgroundColor: theme.card, borderColor: theme.border }]}>          
           <View style={styles.heroContent}>
             <View>
-              <Text style={[styles.heroLabel, { color: theme.subText }]}>Monthly balance</Text>
+              <Text style={[styles.heroLabel, { color: theme.subText }]}>Monthly Spend</Text>
               <Text style={[styles.heroTitle, { color: theme.text }]}>₹ {total.toFixed(0)}</Text>
               <Text style={[styles.heroCaption, { color: progressColor }]}>
                 {overBudget ? "Over budget" : `₹ ${goal - total} left`} • {dailyTarget} / day
@@ -156,13 +166,13 @@ export default function HomeScreen() {
             </View>
           ) : (
             filteredExpenses.map((expense) => (
-              <ExpenseCard key={expense.id} expense={expense} theme={theme} onDelete={handleDelete} />
+              <ExpenseCard key={expense.id} expense={expense} theme={theme} onDelete={handleDelete} onEdit={handleEdit} />
             ))
           )}
         </View>
       </ScrollView>
 
-      <TouchableOpacity style={[styles.fab, { backgroundColor: theme.primary }]} onPress={() => router.push("/add-expense")}>
+      <TouchableOpacity style={[styles.fab, { backgroundColor: theme.primary }]} onPress={() => router.push({ pathname: "/add-expense", params: { themeMode } })}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -176,6 +186,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
     paddingBottom: 100,
+    top:38,
   },
   blob: {
     position: "absolute",

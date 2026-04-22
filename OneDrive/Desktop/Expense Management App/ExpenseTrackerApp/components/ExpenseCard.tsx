@@ -1,4 +1,4 @@
-﻿import { StyleSheet, Text, View } from "react-native";
+﻿import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { RectButton, Swipeable } from "react-native-gesture-handler";
 import { Expense } from "@/constants/types";
 import { ThemePalette } from "@/styles/globalStyles";
@@ -7,9 +7,10 @@ type ExpenseCardProps = {
   expense: Expense;
   theme: ThemePalette;
   onDelete: (id: string) => void;
+  onEdit?: (expense: Expense) => void;
 };
 
-export default function ExpenseCard({ expense, theme, onDelete }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, theme, onDelete, onEdit }: ExpenseCardProps) {
   const renderRightAction = () => (
     <RectButton style={[styles.swipeAction, { backgroundColor: theme.danger }]} onPress={() => onDelete(expense.id)}>
       <Text style={styles.actionText}>Delete</Text>
@@ -27,6 +28,14 @@ export default function ExpenseCard({ expense, theme, onDelete }: ExpenseCardPro
         </View>
         <View style={styles.rightColumn}>
           <Text style={[styles.amount, { color: theme.text }]}>₹ {expense.amount.toFixed(0)}</Text>
+          {onEdit && (
+            <TouchableOpacity 
+              style={[styles.editButton, { backgroundColor: theme.primary }]} 
+              onPress={() => onEdit(expense)}
+            >
+              <Text style={styles.editButtonText}>✏️ Edit</Text>
+            </TouchableOpacity>
+          )}
           <Text style={[styles.date, { color: theme.subText }]}>{expense.date}</Text>
         </View>
       </View>
@@ -43,6 +52,18 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 18,
     marginBottom: 14,
+  },
+  editButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginVertical: 4,
+    alignSelf: "flex-end",
+  },
+  editButtonText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "600",
   },
   category: {
     fontSize: 16,
@@ -67,6 +88,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     width: 90,
+    height: "90%",
     borderTopRightRadius: 24,
     borderBottomRightRadius: 24,
   },
